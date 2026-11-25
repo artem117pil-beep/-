@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#00aaff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Авито">
+<title>Авито-симулятор</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    background: #f2f4f7;
+    color: #1a1a1a;
+    padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    min-height: 100vh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #fff; padding: 16px 20px; border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px;
+    flex-wrap: wrap; gap: 12px;
+  }
+  h1 { font-size: 20px; color: #00aaff; }
+  .wallet { font-size: 18px; font-weight: 600; background: #e8f6ff; padding: 8px 16px; border-radius: 8px; color: #0077b6; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab {
+    flex: 1; padding: 12px 18px; border: none; border-radius: 8px; background: #fff;
+    cursor: pointer; font-size: 14px; font-weight: 500; color: #555;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); transition: 0.15s;
+  }
+  .tab:hover { background: #e8f6ff; }
+  .tab.active { background: #00aaff; color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: #fff; border-radius: 12px; padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .card .emoji { font-size: 36px; }
+  .card .name { font-weight: 600; font-size: 16px; }
+  .card .cat { font-size: 12px; color: #888; text-transform: uppercase; }
+  .card .price { font-size: 18px; font-weight: 700; color: #0077b6; }
+  button.buy {
+    margin-top: auto; padding: 12px; border: none; border-radius: 8px;
+    background: #00aaff; color: #fff; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: 0.15s;
+  }
+  button.buy:hover { background: #0088cc; }
+  button.buy:disabled { background: #ccc; cursor: not-allowed; }
+  .empty { color: #999; padding: 20px; grid-column: 1 / -1; }
+  .price-input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; width: 100%; }
+  .sell-row { display: flex; gap: 8px; }
+  button.sell {
+    padding: 12px 14px; border: none; border-radius: 8px;
+    background: #28a745; color: #fff; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  button.sell:hover { background: #218838; }
+  .reset { margin-top: 24px; width: 100%; padding: 12px; border: none; border-radius: 8px; background: #ff4757; color: #fff; font-weight: 600; cursor: pointer; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; color: #fff; padding: 12px 24px; border-radius: 8px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: 0.25s;
+    z-index: 100; max-width: 90%; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 Авито-симулятор</h1>
+  <div class="wallet">💰 <span id="money">5 000 000</span> ₽</div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="shop">🏪 Магазин</button>
+  <button class="tab" data-tab="inventory">📦 Мои товары</button>
+</div>
+
+<div id="shop" class="grid"></div>
+<div id="inventory" class="grid" style="display:none"></div>
+<button class="reset" id="reset">🔄 Сбросить игру</button>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let money = 5000000;
+let inventory = [];
+
+const shopItems = [
+  { id: 1, name: 'Однокомнатная квартира', cat: 'Квартиры', price: 4000000, emoji: '🏢' },
+  { id: 2, name: 'Двухкомнатная квартира', cat: 'Квартиры', price: 6500000, emoji: '🏢' },
+  { id: 3, name: 'Загородный дом', cat: 'Дома', price: 8500000, emoji: '🏡' },
+  { id: 4, name: 'Дача', cat: 'Дома', price: 1200000, emoji: '🏠' },
+  { id: 5, name: 'iPhone 15', cat: 'Телефоны', price: 90000, emoji: '📱' },
+  { id: 6, name: 'Samsung Galaxy S24', cat: 'Телефоны', price: 75000, emoji: '📱' },
+  { id: 7, name: 'Кнопочный телефон', cat: 'Телефоны', price: 1500, emoji: '☎️' },
+  { id: 8, name: 'Игровой ПК', cat: 'Компьютеры', price: 150000, emoji: '🖥️' },
+  { id: 9, name: 'Ноутбук для работы', cat: 'Компьютеры', price: 60000, emoji: '💻' },
+  { id: 10, name: 'Монитор 27"', cat: 'Компьютеры', price: 25000, emoji: '🖥️' },
+];
+
+const SAVE_KEY = 'avito_sim_save_v1';
+const save = () => localStorage.setItem(SAVE_KEY, JSON.stringify({ money, inventory }));
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (typeof d.money === 'number') money = d.money;
+    if (Array.isArray(d.inventory)) inventory = d.inventory;
+  } catch (e) {}
+}
+
+const fmt = n => n.toLocaleString('ru-RU');
+const moneyEl = document.getElementById('money');
+const toastEl = document.getElementById('toast');
+let toastTimer;
+function updateMoney() { moneyEl.textContent = fmt(money); }
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+}
+
+const shopEl = document.getElementById('shop');
+const invEl = document.getElementById('inventory');
+
+function renderShop() {
+  shopEl.innerHTML = '';
+  shopItems.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="emoji">${item.emoji}</div>
+      <div class="cat">${item.cat}</div>
+      <div class="name">${item.name}</div>
+      <div class="price">${fmt(item.price)} ₽</div>
+      <button class="buy" ${money < item.price ? 'disabled' : ''}>Купить</button>`;
+    card.querySelector('.buy').addEventListener('click', () => buyItem(item));
+    shopEl.appendChild(card);
+  });
+}
+
+function buyItem(item) {
+  if (money < item.price) return;
+  money -= item.price;
+  inventory.push({ ...item, buyPrice: item.price, invId: Date.now() + Math.random() });
+  updateMoney(); renderShop(); renderInventory(); save();
+  toast(`Куплено: ${item.name}`);
+}
+
+function renderInventory() {
+  invEl.innerHTML = '';
+  if (inventory.length === 0) {
+    invEl.innerHTML = '<div class="empty">Пока ничего не куплено. Загляни в магазин!</div>';
+    return;
+  }
+  inventory.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="emoji">${item.emoji}</div>
+      <div class="cat">${item.cat}</div>
+      <div class="name">${item.name}</div>
+      <div class="price">Куплено за ${fmt(item.buyPrice)} ₽</div>
+      <input class="price-input" type="number" inputmode="numeric" placeholder="Ваша цена, ₽" min="1" value="${item.buyPrice}">
+      <div class="sell-row"><button class="sell">Продать</button></div>`;
+    const input = card.querySelector('.price-input');
+    card.querySelector('.sell').addEventListener('click', () => {
+      const price = parseInt(input.value, 10);
+      if (!price || price <= 0) return toast('Введите корректную цену');
+      sellItem(item.invId, price);
+    });
+    invEl.appendChild(card);
+  });
+}
+
+function sellItem(invId, price) {
+  const idx = inventory.findIndex(i => i.invId === invId);
+  if (idx === -1) return;
+  const item = inventory[idx];
+  const market = item.buyPrice;
+  let sold = true, reason = '';
+  if (price > market * 2.5) { sold = Math.random() < 0.3; reason = sold ? '' : 'Слишком дорого — покупатели прошли мимо 😕'; }
+  else if (price > market * 1.5) { sold = Math.random() < 0.7; reason = sold ? '' : 'Цена высоковата, никто не купил'; }
+  if (!sold) return toast(reason || 'Товар не продан');
+  money += price;
+  inventory.splice(idx, 1);
+  updateMoney(); renderShop(); renderInventory(); save();
+  const profit = price - item.buyPrice;
+  toast(`Продан: ${item.name} за ${fmt(price)} ₽ (${profit >= 0 ? '+' : ''}${fmt(profit)} ₽)`);
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    shopEl.style.display = target === 'shop' ? 'grid' : 'none';
+    invEl.style.display = target === 'inventory' ? 'grid' : 'none';
+  });
+});
+
+document.getElementById('reset').addEventListener('click', () => {
+  if (!confirm('Точно сбросить весь прогресс?')) return;
+  money = 5000000; inventory = [];
+  localStorage.removeItem(SAVE_KEY);
+  updateMoney(); renderShop(); renderInventory();
+  toast('Игра сброшена');
+});
+
+load(); updateMoney(); renderShop(); renderInventory();
+
+// ==== Встроенный PWA-манифест (через Blob) ====
+(function injectManifest() {
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#00aaff"/><text x="50%" y="54%" font-size="240" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="Arial">🛒</text></svg>`;
+  const iconUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
+  const manifest = {
+    name: 'Авито-симулятор',
+    short_name: 'Авито',
+    start_url: '.',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: '#f2f4f7',
+    theme_color: '#00aaff',
+    icons: [
+      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },
+      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = URL.createObjectURL(blob);
+  document.head.appendChild(link);
+})();
+
+// ==== Встроенный service worker (через Blob) ====
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'avito-inline-v1';
+    self.addEventListener('install', e => self.skipWaiting());
+    self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+    self.addEventListener('fetch', e => {
+      if (e.request.method !== 'GET') return;
+      e.respondWith(
+        caches.match(e.request).then(c => c || fetch(e.request).then(r => {
+          const copy = r.clone();
+          caches.open(CACHE).then(cc => cc.put(e.request, copy)).catch(()=>{});
+          return r;
+        }).catch(() => c))
+      );
+    });
+  `;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(swBlob);
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(swUrl).catch(err => console.warn('SW:', err));
+  });
+}
+</script>
+</body>
+</html>
